@@ -195,8 +195,13 @@ namespace MiFare.Classic
             if (card.ActiveSector != sector)
             {
                 var writeKey = GetWriteKey(dataBlock.Number);
-                if (!await card.Reader.Login(sector, writeKey))
-                    throw new CardLoginException($"Unable to login in sector {sector} with key {writeKey}");
+                if (!await card.Reader.Login(sector, writeKey)) {
+                    // In some cases, Key A may not be present, so try logging in with Key B
+                    writeKey = writeKey == InternalKeyType.KeyA ? InternalKeyType.KeyB : InternalKeyType.KeyA;
+                    if (!await card.Reader.Login(sector, writeKey)) {
+                        throw new CardLoginException($"Unable to login in sector {sector} with key A or B");
+                    }
+                }
 
                 card.ActiveSector = sector;
             }
