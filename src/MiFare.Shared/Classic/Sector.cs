@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -257,8 +258,43 @@ namespace MiFare.Classic
 
             if (datablock == TrailerBlockIndex)
                 return GetTrailerWriteKey();
+            return GetDatablockWriteKey(datablock);
+        }
 
-            return (originalAccessConditions.DataAreas[Math.Min(datablock, Access.DataAreas.Length - 1)].Write == DataAreaAccessCondition.ConditionEnum.KeyA) ? InternalKeyType.KeyA : InternalKeyType.KeyB;
+        private InternalKeyType GetDatablockWriteKey(int datablock)
+        {
+            //Gets the access conditions of the datablock
+            DataAreaAccessCondition condition = originalAccessConditions.DataAreas[Math.Min(datablock, Access.DataAreas.Length - 1)];
+            //gets the original access bits to check if the card is in "transport configuration"
+            BitArray conditionBits = condition.GetBits();
+            bool cardIsInTransportState = isInTransportState(conditionBits);
+            if(cardIsInTransportState)
+            {
+                return InternalKeyType.KeyA;
+            }
+            else
+            {
+                return (condition.Write == DataAreaAccessCondition.ConditionEnum.KeyA) ? InternalKeyType.KeyA : InternalKeyType.KeyB;
+            }
+           
+        }
+        /// <summary>
+        /// Checks if the Key B is Used for authentication
+        /// </summary>
+        /// <param name="conditionBits">Access bits of the block</param>
+        /// <returns></returns>
+        private bool isInTransportState(BitArray conditionBits)
+        {
+            //casts the BitArray to a IEnumerable<bool> and checks if all of the bits are false (0) 
+            bool datablockIsInTransportState = conditionBits.Cast<bool>().All(bit => bit == false);
+            //checks if the trailer is in transport configuration ([0,0,1])
+            BitArray trailerTransportConfiguration = new BitArray(new bool[] {false,false,true});
+            //gets current trailer block access bits
+            BitArray currentTrailer = originalAccessConditions.Trailer.GetBits();
+
+            bool trailerIsInTransportState = trailerTransportConfiguration.IsEqual(currentTrailer);
+
+            return datablockIsInTransportState && trailerIsInTransportState;
         }
     }
 }
